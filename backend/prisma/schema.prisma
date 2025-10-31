@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum TimeEntryType {
+  CHECK_IN    // 出勤
+  CHECK_OUT   // 退勤
+  BREAK_START // 休憩開始
+  BREAK_END   // 休憩終了
+}
+
+model User {
+  id            String       @id @default(uuid())
+  googleId      String       @unique
+  email         String       @unique
+  name          String
+  picture       String?
+  role          UserRole     @default(USER)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  timeEntries   TimeEntry[]
+  auditLogs     AuditLog[]
+  adminAuditLogs AuditLog[]  @relation("AdminAuditLog")
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model TimeEntry {
+  id            String         @id @default(uuid())
+  userId        String
+  type          TimeEntryType
+  timestamp     DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@index([timestamp])
+}
+
+model AuditLog {
+  id            String      @id @default(uuid())
+  userId        String?
+  adminId       String?
+  action        String      // 操作内容（例: "CHECK_IN", "CHECK_OUT", "USER_MODIFIED" など）
+  resourceType  String      // リソースタイプ（例: "TimeEntry", "User" など）
+  resourceId    String?     // リソースID
+  details       Json?       // 詳細情報（変更前後の値など）
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime    @default(now())
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  admin         User?       @relation("AdminAuditLog", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adminId])
+  @@index([createdAt])
+  @@index([action, resourceType])
+}
+
